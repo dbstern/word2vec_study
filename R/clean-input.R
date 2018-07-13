@@ -4,8 +4,8 @@ source(file.path('.','R','dependencies.R'))
 ## criar arquivo das reviews limpas ----
 file <- file.path("input","reviews_clean.txt")
 if(!file.exists(file)) {
-  data <- fread(file.path("input","Reviews.csv"), header=T)
-  data <- data %>% 
+  data <- fread(file.path("input","Reviews.csv"), header=T)$Text
+  data <- data %>%
     gsub("<br />", " ", .) %>% # Retira linebreaks
     tolower()  %>% # Letras minusculas
     # gsub("[.,]"," ", x = .) %>% # substitui pontos por espacos para nao juntar palavras na remocao de pontos
@@ -22,12 +22,13 @@ if(!file.exists(file)) {
   # linha vazia vai ser pulada (blank.skip.lines=F evita isso)
 }
 
-file <- file.path("input", "labels_clean.txt")
-if(!file.exists(file)) {
-  data <- fread(file.path("input","Reviews.csv"), header=T)
-  y <- as.numeric(data$Score == 5)
-  y <- y[-233939] #Texto em branco 
-  write.table(y,file,row.names = F,col.names = F)
-  rm(data,file)
+files <- file.path("input", paste0("labels_",c("raw","clean"),".txt"))
+if(!all(file.exists(files))) {
+  x <- fread(file.path("input","Reviews.csv"), header = T)$Score
+  write.table(x,files[1],row.names = F,col.names = F)
+  
+  x <- as.numeric(x == 5)[-233939] # texto em branco 
+  write.table(x,files[2],row.names = F,col.names = F)
+  rm(x,files)
 }
 
