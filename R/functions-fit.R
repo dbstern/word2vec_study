@@ -28,12 +28,12 @@ model_lasso <- function(x, y, train, file_out, seed = NULL) {
   xtrain <- x[train,]; ytrain <- y[train]
   xtest <- x[!train,]; ytest <- y[!train]
   
-  flog.info("Estimando Lasso")
-  if(!is.null(seed)) set.seed(seed)
+  flog.info(paste("Estimando Lasso (seed -",seed,")"))
+  set.seed(seed = seed)
   ftry({
     model$lasso <- cv.glmnet(
-      x = xtrain, y = ytrain, family = "binomial", type.measure = "class",
-      standardize = FALSE, lambda = c(0.5^(2:20),0))
+      x = xtrain, y = ytrain, family = "binomial",
+      type.measure = "class", standardize = FALSE)
   })
   saveRDS(model, file = file_out)
   if(is.null(model$lasso)) return(model)
@@ -53,7 +53,7 @@ model_lasso <- function(x, y, train, file_out, seed = NULL) {
   return(model)
 }
 
-model_xgboost <- function(x, y, train, file_out, no_cores = 1) {
+model_xgboost <- function(x, y, train, file_out, seed = NULL, no_cores = 1) {
   model <- list()
   if(file.exists(file_out)) {
     flog.info("Carregando %s", file_out)
@@ -63,7 +63,8 @@ model_xgboost <- function(x, y, train, file_out, no_cores = 1) {
   xtrain <- x[train,]; ytrain <- y[train]
   xtest <- x[!train,]; ytest <- y[!train]
   
-  flog.info("Estimando bst(CV)")
+  flog.info(paste("Estimando bst(CV) (seed -",seed,")"))
+  set.seed(seed = seed)
   ftry({
     model$bstCV <- xgb.cv(
       data = xtrain, label = ytrain, nthread = no_cores, nround = 10000,
@@ -72,8 +73,9 @@ model_xgboost <- function(x, y, train, file_out, no_cores = 1) {
   })
   saveRDS(model, file = file_out)
   
-  flog.info("Estimando bst")
+  flog.info(paste("Estimando bst (seed -",seed,")"))
   nround <- which.min(model$bstCV$evaluation_log$test_error_mean)
+  set.seed(seed = seed)
   ftry({
     model$bst <- xgboost(
       data = xtrain, label = ytrain, nthread = no_cores, nround = nround,
@@ -93,7 +95,7 @@ model_xgboost <- function(x, y, train, file_out, no_cores = 1) {
   return(model)
 }
 
-model_list <- function(x, y, train, file_out, seed = NULL, no_cores = 1, description) {
+model_list <- function(x, y, train, file_out, seed = NULL, no_cores = 1, description = NULL) {
   model <- list(description = description)
   if(file.exists(file_out))
     model <- readRDS(file_out)
