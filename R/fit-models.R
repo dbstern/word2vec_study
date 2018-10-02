@@ -1,86 +1,127 @@
+## global ----
+seed_model_list <- 1:5 # will be set before running each model
+seed_w2v_list <- 1:10
+
+# create directories where models will be saved
+path_out <- file.path(".","output",c("lasso","xgboost"))
+names(path_out) <- c("lasso","xgb")
+x <- lapply(path_out, function(path)
+  if(!dir.exists(path)) dir.create(path, recursive = T)
+); rm(x)
+
 ## dependencias ----
 source(file.path("R","dependencies.R"))
 
 ## load data ----
 y <- read.table(file = file.path("input","labels_clean.txt"),
                 header = FALSE, sep = "\t", stringsAsFactors = FALSE)[[1]]
-bow <- readRDS(file.path("output","bow.rds")) # carregar bow
-train <- gen_train(size = nrow(bow))
+train <- gen_train(size = length(y))
 
-## fit models ----
+## fit models: lasso + xgboost ----
+name_files <- function(seed_model,description) {
+  c("lasso","lasso-withgrid","xgboost") %>%
+    paste0(., if(!is.null(seed_model))"-s", seed_model, "_", description, ".rds") %>%
+    file.path(path_out[c("lasso","lasso","xgb")],.)
+}
+
+## bow ----
+bow <- readRDS(file.path("output","bow","bow.rds"))
 bow <- bow %>% as(.,"sparseMatrix")
-file <- file.path("output","fit_bow.rds")
-model_bow <- model_list(
-  x = bow, y = y, train = train, file_out = file, seed = 1,
-  no_cores = no_cores, description = "bow")
-rm(file)
+description <- "bow"
 
-bow_weights <- bow / rowSums(bow)
-
-w2v100 <- read.vectors(file.path("output","w2v100.bin"))
-w2v100 <- w2v100[colnames(bow_weights),]
-w2v100 <- (bow_weights %*% w2v100) %>% as.matrix()
-file <- file.path("output","fit_w2v100.rds")
-model_w2v100 <- model_list(
-  x = w2v100, y = y, train = train, file_out = file, seed = 10,
-  no_cores = no_cores, description = "w2v100")
-rm(file, w2v100)
-
-w2v300 <- read.vectors(file.path("output","w2v300.bin"))
-w2v300 <- w2v300[colnames(bow_weights),]
-w2v300 <- (bow_weights %*% w2v300) %>% as.matrix()
-file <- file.path("output", "fit_w2v300.rds")
-model_w2v300 <- model_list(
-  x = w2v300, y = y, train = train, file_out = file, seed = 1,
-  no_cores = no_cores, description = "w2v300")
-rm(file, w2v300)
-
-
-# plots
-# load and tidy data
-fits <- paste0(c("fit_bow","fit_w2v100","fit_w2v300"),".rds")
-fits <- file.path("output",fits)
-x <- lapply(fits, function(fit) {
-  fit <- readRDS(fit)
-  roc <- NULL; auc <- NULL
-  
-  if(!is.null(fit$lasso$roc)) {
-    lasso <- fit$lasso$roc[c("sensitivities","specificities")] %>%
-      do.call(cbind, .) %>% as.data.frame() %>%
-      mutate(model = "Lasso")
-    roc <- rbind(roc,lasso)
-    
-    lasso <- data.frame(auc = fit$lasso$roc$auc[[1]]) %>%
-      mutate(model = "Lasso")
-    auc <- rbind(auc,lasso)
-  }
-  if(!is.null(fit$bst$roc)) {
-    bst <- fit$bst$roc[c("sensitivities","specificities")] %>%
-      do.call(cbind, .) %>% as.data.frame() %>%
-      mutate(model = "XGboost")
-    roc <- rbind(roc,bst)
-    
-    bst <- data.frame(auc = fit$lasso$roc$auc[[1]]) %>%
-      mutate(model = "XGboost")
-    auc <- rbind(auc,bst)
-  }
-  
-  roc <- roc %>% mutate(npl = fit$description)
-  auc <- auc %>% mutate(npl = fit$description)
-  list(roc = roc, auc = auc)
+t <- lapply(seed_model_list, function(seed_model) {
+  files <- name_files(seed_model, description)
+  fit <- fit_lasso(
+    x = bow, y = y, train = train, file_out = files[1],
+    description = description, seed = seed_model)
+  fit <- fit_lasso(
+    x = bow, y = y, train = train, file_out = files[2],
+    description = description, seed = seed_model, with_grid = T)
+  fit <- fit_xgboost(
+    x = bow, y = y, train = train, file_out = files[3],
+    description = description, seed = seed_model, no_cores = no_cores)
 })
-roc <- lapply(x, function(y) y$roc) %>% do.call(rbind, .)
-auc <- lapply(x, function(y) y$auc) %>% do.call(rbind, .)
+rm(t,description)
 
-ggplot(data = roc, aes(specificities,sensitivities, col = npl, linetype = model)) +
-  geom_line() + labs(x = "Especificidade", y = "Sensibilidade") +
-  scale_color_discrete(name = "NPL") +
-  scale_linetype_discrete(name = element_blank())
-ggsave2(filename = "roc", path = file.path("plots"), device = "pdf")
+## w2v ----
+w2v_embedding <- expand.grid(
+  dim = c(100,300),
+  stat = c("sum","wsum")
+)
 
-AUC = round(c(model_bow$lasso$roc$auc, model_bow$bst$roc$auc,
-              model_w2v100$lasso$roc$auc, model_w2v100$bst$roc$auc,
-              model_w2v300$lasso$roc$auc, model_w2v300$bst$roc$auc), 2)
-tab = data.frame(Construção = c("Bag-of-words", "Word2vec (D = 100)", "Word2vec (D = 300)"),
-                 "Lasso AUC" = AUC[c(1,3,5)], "XGBoost AUC" = AUC[c(2,4,6)])
-xtable(tab, caption = "Comparação dos modelos pela área abaixo da curva ROC")
+t <- split(w2v_embedding, seq(nrow(w2v_embedding))) %>%
+  lapply(., function(x) {
+    xbow <- bow / if(x$stat == "sum") 1 else rowSums(bow)
+    
+    t <- lapply(seed_w2v_list, function(seed_w2v) {
+      file <- paste0("w2v",x$dim,if(!is.null(seed_w2v))"-s",seed_w2v,".bin") %>%
+        file.path(".","output","w2v",.)
+      if(!file.exists(file)) {
+        flog.warn("Insumo ausente: %s", file)
+        return(NULL)
+      }
+      
+      xw2v <- file %>% read.vectors(.)
+      xw2v <- xw2v[colnames(bow),]
+      xw2v <- (xbow %*% xw2v) %>% as.matrix()
+      
+      description <- paste0("w2v",x$dim,"-",x$stat,
+                            if(!is.null(seed_w2v))"-s",seed_w2v)
+      
+      t <- lapply(seed_model_list, function(seed_model) {
+        files <- name_files(seed_model, description)
+        fit <- fit_lasso(
+          x = xw2v, y = y, train = train, file_out = files[1],
+          description = description, seed = seed_model)
+        fit <- fit_lasso(
+          x = xw2v, y = y, train = train, file_out = files[2],
+          description = description, seed = seed_model, with_grid = T)
+        fit <- fit_xgboost(
+          x = xw2v, y = y, train = train, file_out = files[3],
+          description = description, seed = seed_model, no_cores = no_cores)
+        return(NULL)
+      })
+    })
+  })
+
+## with weights ----
+w2v_embedding <- expand.grid(
+  dim = c(100),
+  stat = "wxgb"
+)
+
+t <- lapply(seed_model_list, function(seed_bow) {
+  # importance of each words (xgboost applied to bow)
+  fit_bow <- name_files(seed_bow, "bow")[3] %>%
+    readRDS(file = .)
+  
+  t <- split(w2v_embedding, seq(nrow(w2v_embedding))) %>%
+    lapply(., function(x) {
+      t <- lapply(seed_w2v_list, function(seed_w2v) {
+        file <- paste0("w2v",x$dim,if(!is.null(seed_w2v))"-s",seed_w2v,".bin") %>%
+          file.path(".","output","w2v",.)
+        if(!file.exists(file)) {
+          flog.warn("Insumo ausente: %s", file)
+          return(NULL)
+        }
+        
+        xw2v <- file %>% read.vectors(.)
+        xw2v <- bow_xgweight(
+          model = fit_bow$xgb, bow = bow, w2v = xw2v) %>% as.matrix
+
+        description <- paste0("w2v",x$dim,if(!is.null(seed_w2v))"-s",seed_w2v,
+                              "-wxgb",if(!is.null(seed_bow))"-s",seed_bow)
+        
+        t <- lapply(seed_model_list, function(seed_model) {
+          files <- name_files(seed_model, description)
+          fit <- fit_lasso(
+            x = xw2v, y = y, train = train, file_out = files[1],
+            description = description, seed = seed_model)
+          fit <- fit_xgboost(
+            x = xw2v, y = y, train = train, file_out = files[3],
+            description = description, seed = seed_model, no_cores = no_cores)
+          return(NULL)
+        })
+      })
+    })
+})
