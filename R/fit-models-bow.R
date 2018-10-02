@@ -6,7 +6,6 @@ cases <- file.path(".","output","track_bow.txt") %>%
   read.table(., header = T, stringsAsFactors = F) %>%
   dplyr::select(., everything(), file = file_out) %>%
   dplyr::rename_all(., .funs = function(x) paste0("bow_", x)) %>%
-  # tidyr::crossing(ncores = no_cores, seed = 1:1)
   tidyr::crossing(seed = 1:1, model = c("lasso","lasso-grid","xgb")) %>%
   dplyr::mutate(ncores = ifelse(model == "xgb", no_cores,  NA))
 cases_rm <- file.path(".","output","track_model-bow.txt") %>%
@@ -20,6 +19,7 @@ rm(cases_rm)
 # create directories where models will be saved
 path_out <- file.path(".","output","model")
 if(!dir.exists(path_out)) dir.create(path_out, recursive = T)
+ggpath <- file.path(".","plots","model-performance")
 
 ## load data ----
 y <- read.table(file = file.path("input","labels_clean.txt"),
@@ -34,27 +34,6 @@ t <- cases %>% split(., .$bow_file) %>%
     
     split(cases, seq(nrow(cases))) %>%
       lapply(., function(case) {
-        # models <- c("lasso","lasso-grid","xgb")[1:2]
-        # files <- paste0(models,"_",description) %>%
-        #   namefile(path = path_out, str = ., extension = ".rds")
-        # cases <- case %>%
-        #   tidyr::crossing(model = models) %>%
-        #   dplyr::mutate(file_out = files) %>%
-        #   dplyr::select(ncores,seed,model,bow_file,file_out)
-        # file.path(".","output","track_model-bow.txt") %>%
-        #   write.table(x = cases, file = ., append = file.exists(.),
-        #               col.names = !file.exists(.), row.names = F)
-
-        # fit <- fit_lasso(
-        #   x = bow, y = y, train = train, file_out = files[1],
-        #   description = description, seed = case$seed)
-        # fit <- fit_lasso(
-        #   x = bow, y = y, train = train, file_out = files[2],
-        #   description = description, seed = case$seed, with_grid = T)
-        # fit <- fit_xgboost(
-        #   x = bow, y = y, train = train, file_out = files[3],
-        #   description = description, seed = case$seed, no_cores = case$ncores)
-        
         file <- paste0(case$model,"_",description) %>%
           namefile(path = path_out, str = ., extension = ".rds")
         case <- case %>%
@@ -96,6 +75,7 @@ cases$auc <- cases %>%
   }) %>%
   unlist()
 
-cases %>%
-  ggplot(., aes(bow_k, auc)) +
-  geom_point() + facet_grid(model ~ .)
+gg <- cases %>% ggplot(., aes(bow_k, auc))
+gg + geom_point() + facet_grid(model ~ .)
+gg + geom_point(aes(col = model), position = position_jitter(w = 10, h = 0))
+ggsave2(filename = "auc_model-bow_npl-cluster", path = ggpath)
