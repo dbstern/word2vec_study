@@ -2,29 +2,27 @@
 source(file.path("R","dependencies.R"))
 
 ## global ----
-cases <- file.path(".","output","track_bow.txt") %>%
+cases_sample <- file.path(".","output","track_sample.txt") %>%
+  read.table(., header = T, stringsAsFactors = F) %>%
+  dplyr::rename_all(., .funs = function(x) paste0("sample_", x))
+cases_bow <- file.path(".","output","track_bow.txt") %>%
   read.table(., header = T, stringsAsFactors = F) %>%
   dplyr::select(., everything(), file = file_out) %>%
-  dplyr::rename_all(., .funs = function(x) paste0("bow_", x)) %>%
-  tidyr::crossing(seed = 1:1, model = c("lasso","lasso-grid","xgb")) %>%
+  dplyr::rename_all(., .funs = function(x) paste0("bow_", x))
+cases <- tidyr::crossing(cases_bow, cases_sample) %>%
+  tidyr::crossing(seed=1:1, model=c("lasso","xgb")) %>% # linux: lasso-grid = lasso
   dplyr::mutate(ncores = ifelse(model == "xgb", no_cores,  NA))
 cases_rm <- file.path(".","output","track_model-bow.txt") %>%
-  read.table(., header = T, stringsAsFactors = F) %>%
-  dplyr::select(., -model)
+  read.table(., header = T, stringsAsFactors = F)
 cases <- merge(cases, cases_rm, all = T) %>%
   dplyr::filter(., is.na(file_out)) %>%
-  dplyr::filter(., (model != "xgb")| (model == "xgb" & bow_k%%200 == 0))
-rm(cases_rm)
+  dplyr::filter(., (model != "xgb")| (model == "xgb" & bow_k%%200 %in% c(NA,0)))
+rm(cases_sample,cases_bow,cases_rm)
 
 # create directories where models will be saved
 path_out <- file.path(".","output","model")
 if(!dir.exists(path_out)) dir.create(path_out, recursive = T)
 ggpath <- file.path(".","plots","model-performance")
-
-## load data ----
-y <- read.table(file = file.path("input","labels_clean.txt"),
-                header = FALSE, sep = "\t", stringsAsFactors = FALSE)[[1]]
-train <- gen_train(size = length(y))
 
 ## fit models: lasso + xgboost ----
 t <- cases %>% split(., .$bow_file) %>%
@@ -34,11 +32,15 @@ t <- cases %>% split(., .$bow_file) %>%
     
     split(cases, seq(nrow(cases))) %>%
       lapply(., function(case) {
+        y <- load_labels(indic_geq = case$sample_igeq)
+        train <- gen_train(size = length(y), seed = case$sample_seed,
+                           prob = case$sample_prob)
+        
         file <- paste0(case$model,"_",description) %>%
           namefile(path = path_out, str = ., extension = ".rds")
         case <- case %>%
           dplyr::mutate(file_out = file) %>%
-          dplyr::select(ncores,seed,model,bow_file,file_out)
+          dplyr::select(sample_id,ncores,seed,model,bow_file,file_out)
         file.path(".","output","track_model-bow.txt") %>%
           write.table(x = case, file = ., append = file.exists(.),
                       col.names = !file.exists(.), row.names = F)
@@ -56,7 +58,7 @@ t <- cases %>% split(., .$bow_file) %>%
       })
   })
 
-## compare roc between clusters ----
+## compare auc between clusters ----
 cases_bow <- file.path(".","output","track_bow.txt") %>%
   read.table(., header = T, stringsAsFactors = F) %>%
   dplyr::select(., everything(), file = file_out) %>%
