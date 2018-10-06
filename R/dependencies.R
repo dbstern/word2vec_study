@@ -33,6 +33,7 @@ library(xgboost)
 library(Ckmeans.1d.dp) # used in plots of xgboost
 
 source(file.path('R','functions-fit.R'))
+source(file.path('R','functions-load.R'))
 
 ggsave2 <- function(filename, path, device="png", units="in", width=9, height=5.5) {
   filename <- paste0(filename,".",device)
