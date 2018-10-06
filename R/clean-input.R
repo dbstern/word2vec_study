@@ -22,13 +22,10 @@ if(!file.exists(file)) {
   # linha vazia vai ser pulada (blank.skip.lines=F evita isso)
 }
 
-files <- file.path("input", paste0("labels_",c("raw","clean"),".txt"))
+file <- file.path("input","labels_raw.txt")
 if(!all(file.exists(files))) {
   x <- fread(file.path("input","Reviews.csv"), header = T)$Score
-  write.table(x,files[1],row.names = F,col.names = F)
-  
-  x <- as.numeric(x == 5)[-233939] # texto em branco 
-  write.table(x,files[2],row.names = F,col.names = F)
-  rm(x,files)
+  write.table(x,file,row.names = F,col.names = F)
+  rm(x,file)
 }
 
