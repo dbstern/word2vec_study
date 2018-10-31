@@ -10,7 +10,8 @@ cases_w2v <- file.path(".","output","track_w2v.txt") %>%
   dplyr::select(., everything(), file = file_out) %>%
   dplyr::rename_all(., .funs = function(x) paste0("w2v_", x))
 cases <- tidyr::crossing(cases_w2v, cases_sample) %>%
-  tidyr::crossing(seed=1:1, stat=c("sum","wsum"), model=c("lasso","xgb")) %>% # linux: lasso-grid = lasso
+  tidyr::crossing(seed=1:1, stat=c("sum","wsum","var"),
+                  model=c("lasso","xgb")) %>% # linux: lasso-grid = lasso
   dplyr::mutate(ncores = ifelse(model == "xgb", no_cores, NA))
 cases_rm <- file.path(".","output","track_model-w2v.txt") %>%
   read.table(., header = T, stringsAsFactors = F)
@@ -39,8 +40,15 @@ t <- cases %>% split(., .$w2v_file) %>%
        train <- gen_train(size = length(y), seed = case$sample_seed,
                           prob = case$sample_prob)
        
-       xbow <- bow / if(case$stat == "sum") 1 else rowSums(bow)
-       w2v <- (xbow %*% w2v) %>% as.matrix()
+       if(case$stat == "var") {
+         x <- seq(nrow(bow)) %>%
+           lapply(., function(idx) {
+             cov.wt(x = w2v@.Data, wt = bow[idx,])$cov %>% diag(.)
+           }) %>% do.call(rbind,.) %>% as.matrix()
+       } else {
+         bow <- bow / if(case$stat == "sum") 1 else rowSums(bow)
+         x <- (bow %*% w2v) %>% as.matrix()
+       }
        
        file <- paste0(case$model,"_",description) %>%
          namefile(path = path_out, str = ., extension = ".rds")
@@ -52,12 +60,12 @@ t <- cases %>% split(., .$w2v_file) %>%
 
        if(str_detect(case$model, pattern = "lasso")) {
          fit <- fit_lasso(
-           x = bow, y = y, train = train, file_out = file,
+           x = x, y = y, train = train, file_out = file,
            description = description, seed = case$seed,
            with_grid = (case$model != "lasso"))
        } else {
          fit <- fit_xgboost(
-           x = bow, y = y, train = train, file_out = file,
+           x = x, y = y, train = train, file_out = file,
            description = description, seed = case$seed, no_cores = case$ncores)
        }
      })
