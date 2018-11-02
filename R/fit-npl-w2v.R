@@ -3,8 +3,7 @@ source(file.path("R","dependencies.R"))
 
 ## global ----
 path_out <- file.path(".","output","w2v")
-if(!dir.exists(path_out))
-  dir.create(path_out, recursive = T)
+if(!dir.exists(path_out)) dir.create(path_out, recursive = T)
 
 cases <- expand.grid(
   ncores = no_cores,
@@ -40,3 +39,33 @@ x <- split(cases, seq(nrow(cases))) %>%
     return(NULL)
 })
 
+## gerar matriz de representação do texto ----
+rm(cases)
+cases_w2v <- file.path(".","output","track_w2v.txt") %>%
+  read.table(., header = T, stringsAsFactors = F) %>%
+  dplyr::select(., everything(), file = file_out) %>%
+  dplyr::rename_all(., .funs = function(x) paste0("w2v_", x))
+
+data <- file.path("input","reviews_clean.txt") %>%
+  read.table(., header = F, sep = "\t", stringsAsFactors = F)
+
+r <- cases_w2v %>% split(., seq(nrow(.))) %>%
+  lapply(., function(case) {
+  w2v <- case$w2v_file %>% read.vectors(.)
+  
+  r <- seq(nrow(data)) %>%
+    purrr::map(., function(idx) {
+      file <- paste0("w2v",case$w2v_dim,"_text",idx) %>%
+        namefile(path = path_out, str = ., extension = ".bin")
+      case <- data.frame(text = idx, w2v_file = case$w2v_file, file_out = file)
+      file.path(".","output","track_text-w2v.txt") %>%
+        write.table(x = case, file = ., append = file.exists(.),
+                    col.names = !file.exists(.), row.names = F)
+      
+      words <- data[idx,] %>% str_split(., "[[:space:]]")
+      w2v[match(words, row.names(w2v), nomatch = 0),] %>%
+        write.binary.word2vec(., filename = file)
+    })
+  
+  NULL
+})
