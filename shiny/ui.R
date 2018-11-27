@@ -23,7 +23,10 @@ dashboardPage(
           selectInput("select_dim", label = "Dim w2v",
                       choices = sort(cases$w2v$w2v_dim),
                       selected = 100),
-          checkboxInput("select_pca", "Aplicar PCA", value = T),
+          radioButtons("select_rdim", label = "Red. Dim.",
+                       choices = list("Nenhuma" = "NULL",
+                                      "t-SNE" = "tsne",
+                                      "PCA" = "pca")),
           uiOutput("selectors")
         ),
         mainPanel(

@@ -1,5 +1,5 @@
 output$select_w2v_ts <- renderUI({
-  max <- ifelse(input$select_pca, 2, input$select_dim)
+  max <- ifelse(input$select_rdim == "tsne", 2, input$select_dim)
   tagList(
     numericInput("y", label="dim", value=1, min = 1, max = max, step = 1),
     numericInput("text", label="Text", value=1, min = 1, max = length(req(label())), step = 1)

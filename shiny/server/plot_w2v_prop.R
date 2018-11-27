@@ -13,11 +13,11 @@ output$plot <- renderPlotly({
   bow <- bow()
   w2v <- w2v()
 
-  if(!input$select_pca) {
+  if(input$select_rdim == "tsne") {
+    x <- w2v %>% dplyr::rename(.,X=V1,Y=V2)
+  } else {
     x <- w2v[c(req(input$x),req(input$y))] %>%
       dplyr::rename(.,X=1,Y=2)
-  } else {
-    x <- w2v %>% dplyr::rename(.,X=V1,Y=V2)
   }
   
   x <- x %>% tibble::rownames_to_column(., var = "words") %>%

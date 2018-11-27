@@ -12,7 +12,7 @@ function(input, output) {
   })
   w2v <- eventReactive({
     input$select_dim
-    input$select_pca
+    input$select_rdim
   }, {
     bow <- req(bow())
     w2v <- cases$w2v %>%
@@ -23,9 +23,12 @@ function(input, output) {
       as.matrix()
     w2v <- w2v[colnames(bow),]
     
-    if(input$select_pca) {
+    if(input$select_rdim == "tsne") {
       x <- Rtsne(w2v, perplexity = 50, pca = FALSE)$Y
       row.names(x) <- row.names(w2v)
+      w2v <- x %>% as.data.frame(.)
+    } else if(input$select_rdim == "pca") {
+      x <- prcomp(w2v, center = TRUE, scale = TRUE)$x
       w2v <- x %>% as.data.frame(.)
     } else {
       w2v <- w2v@.Data %>% as.data.frame(.)
