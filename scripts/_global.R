@@ -1,6 +1,6 @@
 ## global variables! - this will define loading functions, etc ----
 
-## '.' indicates that the dataset is going to downloaded from a package! - pck_name.db_name
+# define which of the following datasets is going to be run:
 # amzn - amazon food and wine reviews
 # proc - dados processos abj
 # nltk.reuters - Reuters-21578
@@ -9,9 +9,10 @@
 # imdb - db usado no artigo do d2v (mikolov)
 db <- "nltk.reuters"
 
-# remove stopwords/single letter words
+# define if stopwords/single letter words should be removed
 rmstopw <- T
 
-basepath <- file.path("/mnt/36D0BB68D0BB2CCD/dbstern", db)
+# directory where files will be saved 
+basepath <- file.path("parent_directory_where_files_are_saved", db)
 if(!dir.exists(basepath)) dir.create(basepath, recursive = T)
 
