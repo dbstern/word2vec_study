@@ -3,39 +3,20 @@ dashboardPage(
     title = "word2vec study"
   ),
   dashboardSidebar(
+    selectInput(inputId = "db", label = "Dataset", multiple = F,
+                choices = list("Amazon"="amzn",
+                               "Processos"="proc",
+                               "Reuters"="nltk.reuters",
+                               "Petições"="ptin",
+                               "IMDB"="imdb"),
+                selected = "imdb"),
     sidebarMenu(
-      menuItem("w2v", tabName = "w2v"),
-      menuItem("modelo w2v", tabName = "mw2v")
+      id = "tab",
+      menuItem("db info", tabName = "tab_db", selected = T),
+      menuItem("w2v embeddings", tabName = "tab_w2v"),
+      menuItem("prediction models", tabName = "tab_mw2v"),
+      menuItem("feature importance", tabName = "tab_mxgb")
     )
   ),
-  dashboardBody(
-    tabItems(
-      tabItem(
-        tabName = "w2v",
-        sidebarPanel(
-          selectInput(
-            "select_plot",
-            label = "Tipo de Gráfico", 
-            choices = list("W2V Prop. 0/1" = "plot_w2v_prop",
-                           "W2V Temp" = "plot_w2v_ts"),
-            selected = "plot_w2v_ts"
-          ),
-          selectInput("select_dim", label = "Dim w2v",
-                      choices = sort(cases$w2v$w2v_dim),
-                      selected = 100),
-          radioButtons("select_rdim", label = "Red. Dim.",
-                       choices = list("Nenhuma" = "NULL",
-                                      "t-SNE" = "tsne",
-                                      "PCA" = "pca")),
-          uiOutput("selectors")
-        ),
-        mainPanel(
-          plotlyOutput("plot")
-        )
-      )
-    ),
-      tabItem(
-        tabName = "mw2v"
-      )
-  )
+  dashboardBody(uiOutput("container"))
 )

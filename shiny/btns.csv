@@ -1,0 +1,14 @@
+type,opt,label,selected,proc,amzn,nltk.reuters,ptin,imdb,info
+na,NULL,-,NA,TRUE,TRUE,TRUE,TRUE,TRUE,NA
+w2v,rmstopw,RmStopW,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,Stopwords and one letter words are removed from the corpus.
+w2v,dim,Dim w2v,NA,TRUE,TRUE,TRUE,TRUE,TRUE,Length of embeddings on Word2Vec method.
+d2v,dim,Dim d2v,NA,TRUE,TRUE,TRUE,TRUE,TRUE,Length of embeddings on Doc2Vec method.
+sample,sample_igeq,I(>=),4,FALSE,TRUE,FALSE,FALSE,FALSE,NA
+sample,sample_prob,%Train,0.5,TRUE,TRUE,FALSE,TRUE,FALSE,Probability of an observation being sampled as training on the prediction model.
+bow,k,Clusters,NA,TRUE,TRUE,TRUE,TRUE,TRUE,Number of clusters applied to BOW.
+model,dred_w2v,DimRed w2v,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,Type of dimension reduction applied to the Word2Vec embeddings.
+model,modbow,ModBOW,FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,"The words ""precedente"" and ""imprecedente"" (founded and unfounded in portuguese) are removed from the corpus."
+model,label,Label,NA,FALSE,FALSE,TRUE,FALSE,FALSE,Which label of the datasets are to be selected.
+model,model,Model,NA,TRUE,TRUE,TRUE,TRUE,TRUE,Predictive model.
+model,return,Return,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,"Instead of the embeddings, using theirs returns (difference between words next to each other)."
+model,stat,Stats (g),NA,TRUE,TRUE,TRUE,TRUE,TRUE,Summary statistics used.
