@@ -8,6 +8,14 @@ gen_train <- function(size, seed = 1234, prob = .5) {
   return(train)
 }
 
+boot_f1 <- function(data, indices) {
+  dt <-data[indices,]
+  pd <- ROCR::prediction(dt[,1],dt[,2])
+  f1 <- ROCR::performance(pd,"f")
+  f1 <- f1@y.values[[1]][f1@x.values[[1]]==1]
+  return(f1)
+}
+
 fit_lasso <- function(x, y, train, file_out, seed = NULL, ncores = 1) {
   flog.info("START: Ajuste lasso - seed %s", seed)
   
@@ -18,18 +26,18 @@ fit_lasso <- function(x, y, train, file_out, seed = NULL, ncores = 1) {
   } else {
     flog.info("Salvando em %s", file_out)
   }
-
+  
   if(!"lasso" %in% names(fit)) {
     flog.info("cv.biglasso")
     fit$coefnames <- attr(x, "fbm_names")
     xtrain <- big_copy(x, ind.row = which(train),
                        backingfile = paste0(bigstatsr::sub_bk(x$bk),"-train"))
     # ftry({
-      fit$lasso <- biglasso::cv.biglasso(
-        X = xtrain$bm(), y = y[train], ncores = ncores, seed = seed,
-        penalty = "lasso", family = "binomial", nfolds = 10)
-      saveRDS(fit, file = file_out)
-      unlink(xtrain$bk);rm(xtrain);gc()
+    fit$lasso <- biglasso::cv.biglasso(
+      X = xtrain$bm(), y = y[train], ncores = ncores, seed = seed,
+      penalty = "lasso", family = "binomial", nfolds = 10)
+    saveRDS(fit, file = file_out)
+    unlink(xtrain$bk);rm(xtrain);gc()
     # })
   }
   flog.info("roc")
@@ -38,18 +46,28 @@ fit_lasso <- function(x, y, train, file_out, seed = NULL, ncores = 1) {
                       backingfile = paste0(bigstatsr::sub_bk(x$bk),"-test"))
     if(is.null(fit$lasso)) return(fit)
     # ftry({
-      fit$test <- as.numeric(predict(
-        fit$lasso, X = xtest$bm(), type = "response",
-        lambda = fit$lasso$lambda.min))
-      saveRDS(fit, file = file_out)
+    fit$test <- as.numeric(predict(
+      fit$lasso, X = xtest$bm(), type = "response",
+      lambda = fit$lasso$lambda.min))
+    saveRDS(fit, file = file_out)
     # })
     unlink(xtest$bk);rm(xtest);gc()
   }
   if(!"roc" %in% names(fit)) {
+    flog.info("roc")
     # ftry({
-      fit$roc <- roc(y[!train], fit$test)
-      saveRDS(fit, file = file_out)
+    fit$roc <- roc(y[!train], fit$test)
+    saveRDS(fit, file = file_out)
     # })
+  }
+  if(!"f1_boot" %in% names(fit)) {
+    flog.info("f1_boot")
+    threshold <- pROC::coords(
+      fit$roc, x = "best", ret="threshold", transpose=F)[[1]]
+    data <- cbind(y[!train],(fit$test>threshold))
+    fit$f1_boot <- boot(
+      data = data, statistic = boot_f1, R = 1000, ncpus = ncores)
+    saveRDS(fit, file = file_out)
   }
   
   flog.info("END")
@@ -105,6 +123,15 @@ fit_xgboost <- function(data, train, file_out, seed = NULL, ncores = 1) {
   }
   if(!"roc" %in% names(fit)) {
     fit$roc <- roc(xgboost::getinfo(dtest, 'label'), fit$test)
+    saveRDS(fit, file = file_out)
+  }
+  if(!"f1_boot" %in% names(fit)) {
+    flog.info("f1_boot")
+    threshold <- pROC::coords(
+      fit$roc, x = "best", ret="threshold", transpose=F)[[1]]
+    x <- cbind(xgboost::getinfo(dtest, 'label'),(fit$test>threshold))
+    fit$f1_boot <- boot(
+      data = x, statistic = boot_f1, R = 1000, ncpus = ncores)
     saveRDS(fit, file = file_out)
   }
   rm(dtest); gc()

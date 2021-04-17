@@ -17,6 +17,8 @@ requiredPackages <- c(
   "biglasso", # lasso using bigmemory object
   "bigstatsr", # help functions for bigmemory
   "pROC",
+  "ROCR",
+  "boot",
   "xgboost"
 )
 for(pkg in requiredPackages){
