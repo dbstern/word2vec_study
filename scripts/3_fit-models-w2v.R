@@ -192,24 +192,16 @@ cases <- cases %>%
 cases_error <- cases %>%
   split(., seq(nrow(.)), drop = T) %>%
   lapply(., function(case) {
-    file <- ifelse(is.na(case$file_model), get_relpath("mw2v",T), case$file_model)
+    file <- ifelse(is.na(case$file_model), get_relpath("mw2v",T),  get_relpath("mw2v",case$file_model))
     case_cols <- c("sample_id","model_ncores","model_seed","modbow","return",
                    "dred_w2v","stat","label","model","file_w2v","file_model")
     case <- dplyr::mutate(case, file_model = basename(file))
     case_save <- dplyr::select(case, one_of(case_cols))
     
-    # y <- load_label(indic_geq = case$sample_igeq) %>% as.numeric(.)
     y <- load_label(indic_geq = case$sample_igeq, label = case$label) %>% as.numeric(.)
     train <- gen_train(size = length(y), seed = case$sample_seed, prob = case$sample_prob)
     
-    # w2v <- get_relpath("w2v",case$file_w2v) %>% read.vectors(.)
-    # words <- match(colnames(bow), row.names(w2v), nomatch = 0)
-    # if(length(which(words==0)) > 0) bow <- bow[,-which(words==0)]
-    # bow <- bow %>% as.matrix(.)
-    # rm(w2v,words)
-    
     flog.info(paste(names(case),case,collapse = "\t",sep = ":"))
-    # x <- load_stw2v_old(get_relpath("stw2v",case$file_stw2v), case$stat, case$model)
     tryCatch({
       x <- load_stw2v(file = get_relpath("stw2v",case$file_stw2v), stat = case$stat,
                       model = case$model, train = train, ncores = case$model_ncores)
@@ -222,15 +214,7 @@ cases_error <- cases %>%
       flog.error(e)
       return(NULL)
     })
-    # if(stringr::str_detect(case$stat,"rawmean")) {
-    #   x_raw <- case %>%
-    #     dplyr::mutate(., return=F, file_stw2v=NULL, stat="mean") %>%
-    #     merge(., cases) %>% pull(., file_stw2v)
-    #   load_stw2v(., "mean", case$model)
-    #   x <- merge(x, x_raw)
-    #   rm(x_raw)
-    # }
-    
+
     get_relpath("mw2v",NULL) %>%
       write.table(x = case_save, file = ., append = file.exists(.),
                   col.names = !file.exists(.), row.names = F)
